@@ -1,0 +1,28 @@
+[package]
+name = "gdock-py"
+version = "0.1.0"
+edition = "2021"
+license = "0BSD"
+authors = ["Rodrigo V. Honorato <rvhonorato@protonmail.com>"]
+description = "Information-driven protein-protein docking - Python bindings"
+repository = "https://github.com/rvhonorato/gdock-py"
+homepage = "https://gdock.org"
+readme = "README.md"
+
+[lib]
+name = "_internal"
+crate-type = ["cdylib"]
+
+[dependencies]
+gdock = "2.0.0"
+pyo3 = "0.26"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+pyo3 = { version = "0.26", features = ["auto-initialize"] }
+
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
