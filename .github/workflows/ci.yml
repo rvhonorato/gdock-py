@@ -26,6 +26,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
+          uv python install ${{ matrix.python-version }}
           uv pip install --system maturin pytest
       - name: Build and test
         run: |
