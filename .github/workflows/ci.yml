@@ -13,9 +13,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    env:
-      UV_SYSTEM_PYTHON: 1
-      UV_BREAK_SYSTEM_PACKAGES: 1
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
@@ -24,10 +21,13 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Create virtual environment
+        run: |
+          uv venv --python ${{ matrix.python-version }} .venv
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
       - name: Install dependencies
         run: |
-          uv python install ${{ matrix.python-version }}
-          uv pip install --system maturin pytest
+          uv pip install maturin pytest
       - name: Build and test
         run: |
           maturin develop --uv
