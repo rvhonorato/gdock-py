@@ -30,8 +30,18 @@ result = gdock.dock(
     seed=42,
 )
 print(f"Generations run: {result['generationsRun']}")
-print(f"Best fitness: {result['poses'][0]['fitness']}")
-best_pdb = result["poses"][0]["pdb"]
+print(f"Best fitness: {result['models'][0]['fitness']}")
+best_pdb = result["models"][0]["pdb"]
+
+# Sampling mode — collect a large pool of unique conformations sorted by fitness
+result = gdock.dock(
+    receptor_pdb,
+    ligand_pdb,
+    restraints=[(10, 20), (15, 25)],
+    sampling=500,
+)
+for model in result["models"]:
+    print(f"rank={model['rank']} fitness={model['fitness']:.3f}")
 ```
 
 ## API
@@ -39,21 +49,26 @@ best_pdb = result["poses"][0]["pdb"]
 ### `score(receptor_pdb, ligand_pdb, w_vdw=0.4, w_elec=0.05, w_desolv=3.4) -> dict`
 
 Computes VDW, electrostatic and desolvation energy terms for a receptor-ligand
-pose. Returns `{"vdw", "elec", "desolv", "total"}`.
+complex. Returns `{"vdw", "elec", "desolv", "total"}`.
 
-### `dock(receptor_pdb, ligand_pdb, restraints=None, max_generations=250, seed=42) -> dict`
+### `dock(receptor_pdb, ligand_pdb, restraints=None, max_generations=250, seed=42, sampling=None) -> dict`
 
-Runs the genetic algorithm docking pipeline and returns ranked poses:
+Runs the genetic algorithm docking pipeline and returns ranked models:
 
 ```
 {
   "generationsRun": int,
-  "poses": [
+  "models": [
     {"rank", "fitness", "vdw", "elec", "desolv", "air", "pdb"},
     ...
   ]
 }
 ```
+
+By default, returns up to 5 cluster-representative models selected by FCC
+clustering. When `sampling=N` is set, the Hall-of-Fame capacity is raised to N
+and all accumulated unique conformations are returned sorted by fitness — useful
+for generating a diverse pool for downstream selection.
 
 ## Development
 
