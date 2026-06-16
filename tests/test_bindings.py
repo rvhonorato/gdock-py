@@ -29,9 +29,9 @@ def test_dock():
         seed=1,
     )
     assert result["generationsRun"] >= 1
-    assert len(result["poses"]) > 0
+    assert len(result["models"]) > 0
 
-    pose = result["poses"][0]
-    assert pose["rank"] == 1
-    assert "pdb" in pose
-    assert "ATOM" in pose["pdb"]
+    model = result["models"][0]
+    assert model["rank"] == 1
+    assert "pdb" in model
+    assert "ATOM" in model["pdb"]
