@@ -198,9 +198,9 @@ dependencies = [
 
 [[package]]
 name = "gdock"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7045b3a9d5ee6950ceaacb5fc51f31915437813b863fb0b2554a93d2e02fba"
+checksum = "2560d3041fdaebc851318be21b46fc17eaa77c3ebefde6af6581311e29d4a55b"
 dependencies = [
  "clap",
  "colored",
@@ -213,7 +213,7 @@ dependencies = [
 
 [[package]]
 name = "gdock-py"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gdock",
  "pyo3",

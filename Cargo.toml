@@ -1,6 +1,6 @@
 [package]
 name = "gdock-py"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "0BSD"
 authors = ["Rodrigo V. Honorato <rvhonorato@protonmail.com>"]
@@ -14,7 +14,7 @@ name = "_internal"
 crate-type = ["cdylib"]
 
 [dependencies]
-gdock = "2.0.0"
+gdock = "2.1.0"
 pyo3 = "0.26"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
