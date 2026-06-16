@@ -16,7 +16,6 @@ DATA_DIR = Path(__file__).parent / "data"
 RECEPTOR_PDB = DATA_DIR / "2oob_A.pdb"
 LIGAND_PDB = DATA_DIR / "2oob_B.pdb"
 
-# Receptor:ligand residue restraint pairs (from the gdock CLAUDE.md example)
 RESTRAINTS = [
     (933, 6),
     (936, 8),
@@ -46,17 +45,36 @@ def main():
         seed=42,
     )
     print(f"generations run: {result['generationsRun']}")
-    for pose in result["poses"]:
+    for model in result["models"]:
         print(
-            f"  rank={pose['rank']} fitness={pose['fitness']:.3f} "
-            f"vdw={pose['vdw']:.3f} elec={pose['elec']:.3f} "
-            f"desolv={pose['desolv']:.3f} air={pose['air']:.3f}"
+            f"  rank={model['rank']} fitness={model['fitness']:.3f} "
+            f"vdw={model['vdw']:.3f} elec={model['elec']:.3f} "
+            f"desolv={model['desolv']:.3f} air={model['air']:.3f}"
         )
 
-    best_pdb = result["poses"][0]["pdb"]
-    with open("best_pose.pdb", "w") as f:
+    best_pdb = result["models"][0]["pdb"]
+    with open("best_model.pdb", "w") as f:
         f.write(best_pdb)
-    print("\nWrote best pose to best_pose.pdb")
+    print("\nWrote best model to best_model.pdb")
+
+    print("\n== dock() with sampling ==")
+    result = gdock.dock(
+        receptor_pdb,
+        ligand_pdb,
+        restraints=RESTRAINTS,
+        max_generations=10,
+        seed=42,
+        sampling=500,
+    )
+    print(f"generations run: {result['generationsRun']}")
+    print(f"models returned: {len(result['models'])}")
+
+    sampling_dir = Path("sampling")
+    sampling_dir.mkdir(exist_ok=True)
+    for model in result["models"]:
+        pdb_path = sampling_dir / f"gdock_{model['rank']}.pdb"
+        pdb_path.write_text(model["pdb"])
+    print(f"  wrote {len(result['models'])} models to {sampling_dir}/")
 
 
 if __name__ == "__main__":

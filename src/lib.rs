@@ -3,10 +3,11 @@
 use gdock::chromosome::Chromosome;
 use gdock::constants::{self, EnergyWeights};
 use gdock::fitness;
+use gdock::hall_of_fame::HallOfFameEntry;
 use gdock::population::Population;
 use gdock::restraints::create_restraints_from_pairs;
 use gdock::runner::{run_ga, select_models};
-use gdock::structure::{self, Molecule};
+use gdock::structure::{self, combine_molecules, Molecule};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -60,10 +61,10 @@ fn score(
     Ok(dict.into())
 }
 
-/// A single ranked docking pose.
+/// A single ranked docking model.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Pose {
+struct Model {
     rank: usize,
     fitness: f64,
     vdw: f64,
@@ -78,7 +79,7 @@ struct Pose {
 #[serde(rename_all = "camelCase")]
 struct DockResult {
     generations_run: u64,
-    poses: Vec<Pose>,
+    models: Vec<Model>,
 }
 
 /// Run the genetic algorithm docking pipeline.
@@ -89,13 +90,17 @@ struct DockResult {
 ///     restraints: List of (receptor_resseq, ligand_resseq) pairs for distance restraints
 ///     max_generations: Maximum number of GA generations (default: 250)
 ///     seed: Random seed for reproducibility (default: 42)
+///     sampling: If set, collect up to this many unique poses sorted by fitness and return
+///               all of them instead of the default top-5 cluster representatives.
+///               PDB strings are returned in-memory; writing to disk is the caller's
+///               responsibility.
 ///
 /// Returns:
 ///     dict with keys:
 ///         - generations_run: number of generations executed
-///         - poses: ranked poses, each with rank, fitness, vdw, elec, desolv, air, pdb
+///         - models: ranked models, each with rank, fitness, vdw, elec, desolv, air, pdb
 #[pyfunction]
-#[pyo3(signature = (receptor_pdb, ligand_pdb, restraints=None, max_generations=None, seed=None))]
+#[pyo3(signature = (receptor_pdb, ligand_pdb, restraints=None, max_generations=None, seed=None, sampling=None))]
 fn dock(
     py: Python<'_>,
     receptor_pdb: &str,
@@ -103,6 +108,7 @@ fn dock(
     restraints: Option<Vec<(i32, i32)>>,
     max_generations: Option<u64>,
     seed: Option<u64>,
+    sampling: Option<usize>,
 ) -> PyResult<Py<PyDict>> {
     let receptor = parse_molecule(receptor_pdb, "Receptor")?;
     let ligand = parse_molecule(ligand_pdb, "Ligand")?;
@@ -128,35 +134,51 @@ fn dock(
         None,
     );
 
-    let ga_result = run_ga(pop, &mut rng, max_generations, |_, _| {});
+    let hof_capacity = sampling.unwrap_or(constants::HALL_OF_FAME_MAX_SIZE);
+    let ga_result = run_ga(pop, &mut rng, max_generations, hof_capacity, |_, _| {});
     let hof_entries = ga_result.hall_of_fame.entries();
-    let selected = select_models(hof_entries, &receptor, &ligand);
 
-    let poses: Vec<Pose> = selected
-        .ranked
+    let entries: Vec<&HallOfFameEntry> = if sampling.is_some() {
+        let mut sorted: Vec<&HallOfFameEntry> = hof_entries.iter().collect();
+        sorted.sort_by(|a, b| {
+            a.fitness
+                .partial_cmp(&b.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        sorted
+    } else {
+        let selected = select_models(hof_entries, &receptor, &ligand);
+        selected
+            .ranked
+            .iter()
+            .map(|&idx| &hof_entries[idx])
+            .collect()
+    };
+
+    let models: Vec<Model> = entries
         .iter()
         .enumerate()
-        .map(|(i, &hof_idx)| {
-            let entry = &hof_entries[hof_idx];
+        .map(|(i, entry)| {
             let docked = ligand
                 .clone()
                 .rotate(entry.genes[0], entry.genes[1], entry.genes[2])
                 .displace(entry.genes[3], entry.genes[4], entry.genes[5]);
-            Pose {
+            let complex = combine_molecules(&receptor, &docked);
+            Model {
                 rank: i + 1,
                 fitness: entry.fitness,
                 vdw: entry.vdw,
                 elec: entry.elec,
                 desolv: entry.desolv,
                 air: entry.air,
-                pdb: docked.to_pdb_string(),
+                pdb: complex.to_pdb_string(),
             }
         })
         .collect();
 
     let result = DockResult {
         generations_run: ga_result.generations_run,
-        poses,
+        models,
     };
 
     let json = serde_json::to_string(&result)
@@ -207,6 +229,7 @@ mod tests {
                 Some(vec![(1, 1)]),
                 Some(2),
                 Some(1),
+                None,
             )
             .unwrap();
             let dict = result.bind(py);
@@ -217,9 +240,9 @@ mod tests {
                 .extract()
                 .unwrap();
             assert!(generations_run >= 1);
-            let poses = dict.get_item("poses").unwrap().unwrap();
-            let poses = poses.downcast::<PyList>().unwrap();
-            assert!(poses.len() > 0);
+            let models = dict.get_item("models").unwrap().unwrap();
+            let models = models.downcast::<PyList>().unwrap();
+            assert!(models.len() > 0);
         });
     }
 }
