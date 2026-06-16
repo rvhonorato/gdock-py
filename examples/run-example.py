@@ -42,6 +42,7 @@ def main():
         ligand_pdb,
         restraints=RESTRAINTS,
         max_generations=10,
+        population_size=50,
         seed=42,
     )
     print(f"generations run: {result['generationsRun']}")
@@ -63,6 +64,7 @@ def main():
         ligand_pdb,
         restraints=RESTRAINTS,
         max_generations=10,
+        population_size=50,
         seed=42,
         sampling=500,
     )

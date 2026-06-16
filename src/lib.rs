@@ -89,6 +89,7 @@ struct DockResult {
 ///     ligand_pdb: PDB string of the ligand
 ///     restraints: List of (receptor_resseq, ligand_resseq) pairs for distance restraints
 ///     max_generations: Maximum number of GA generations (default: 250)
+///     population_size: Number of individuals in the GA population (default: 150)
 ///     seed: Random seed for reproducibility (default: 42)
 ///     sampling: If set, collect up to this many unique poses sorted by fitness and return
 ///               all of them instead of the default top-5 cluster representatives.
@@ -100,13 +101,15 @@ struct DockResult {
 ///         - generations_run: number of generations executed
 ///         - models: ranked models, each with rank, fitness, vdw, elec, desolv, air, pdb
 #[pyfunction]
-#[pyo3(signature = (receptor_pdb, ligand_pdb, restraints=None, max_generations=None, seed=None, sampling=None))]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (receptor_pdb, ligand_pdb, restraints=None, max_generations=None, population_size=None, seed=None, sampling=None))]
 fn dock(
     py: Python<'_>,
     receptor_pdb: &str,
     ligand_pdb: &str,
     restraints: Option<Vec<(i32, i32)>>,
     max_generations: Option<u64>,
+    population_size: Option<u64>,
     seed: Option<u64>,
     sampling: Option<usize>,
 ) -> PyResult<Py<PyDict>> {
@@ -117,10 +120,11 @@ fn dock(
     let restraint_list = create_restraints_from_pairs(&receptor, &ligand, &pairs);
 
     let max_generations = max_generations.unwrap_or(constants::MAX_GENERATIONS);
+    let population_size = population_size.unwrap_or(constants::POPULATION_SIZE);
     let mut rng = StdRng::seed_from_u64(seed.unwrap_or(constants::RANDOM_SEED));
 
-    let mut chromosomes = Vec::with_capacity(constants::POPULATION_SIZE as usize);
-    for _ in 0..constants::POPULATION_SIZE {
+    let mut chromosomes = Vec::with_capacity(population_size as usize);
+    for _ in 0..population_size {
         chromosomes.push(Chromosome::new(&mut rng));
     }
 
@@ -228,6 +232,7 @@ mod tests {
                 ligand_pdb,
                 Some(vec![(1, 1)]),
                 Some(2),
+                None,
                 Some(1),
                 None,
             )

@@ -51,7 +51,7 @@ for model in result["models"]:
 Computes VDW, electrostatic and desolvation energy terms for a receptor-ligand
 complex. Returns `{"vdw", "elec", "desolv", "total"}`.
 
-### `dock(receptor_pdb, ligand_pdb, restraints=None, max_generations=250, seed=42, sampling=None) -> dict`
+### `dock(receptor_pdb, ligand_pdb, restraints=None, max_generations=250, population_size=150, seed=42, sampling=None) -> dict`
 
 Runs the genetic algorithm docking pipeline and returns ranked models:
 
