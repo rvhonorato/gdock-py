@@ -13,6 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rayon::ThreadPoolBuilder;
 use serde::Serialize;
 
 /// Parse a single-model PDB string into a `Molecule`, erroring if it has no atoms.
@@ -90,6 +91,7 @@ struct DockResult {
 ///     restraints: List of (receptor_resseq, ligand_resseq) pairs for distance restraints
 ///     max_generations: Maximum number of GA generations (default: 250)
 ///     population_size: Number of individuals in the GA population (default: 150)
+///     ncores: Number of CPU threads for parallel fitness evaluation (default: all available)
 ///     seed: Random seed for reproducibility (default: 42)
 ///     sampling: If set, collect up to this many unique poses sorted by fitness and return
 ///               all of them instead of the default top-5 cluster representatives.
@@ -102,7 +104,7 @@ struct DockResult {
 ///         - models: ranked models, each with rank, fitness, vdw, elec, desolv, air, pdb
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (receptor_pdb, ligand_pdb, restraints=None, max_generations=None, population_size=None, seed=None, sampling=None))]
+#[pyo3(signature = (receptor_pdb, ligand_pdb, restraints=None, max_generations=None, population_size=None, ncores=None, seed=None, sampling=None))]
 fn dock(
     py: Python<'_>,
     receptor_pdb: &str,
@@ -110,6 +112,7 @@ fn dock(
     restraints: Option<Vec<(i32, i32)>>,
     max_generations: Option<u64>,
     population_size: Option<u64>,
+    ncores: Option<usize>,
     seed: Option<u64>,
     sampling: Option<usize>,
 ) -> PyResult<Py<PyDict>> {
@@ -139,7 +142,13 @@ fn dock(
     );
 
     let hof_capacity = sampling.unwrap_or(constants::HALL_OF_FAME_MAX_SIZE);
-    let ga_result = run_ga(pop, &mut rng, max_generations, hof_capacity, |_, _| {});
+    // 0 tells rayon to use all available logical CPUs (its default behaviour).
+    let pool = ThreadPoolBuilder::new()
+        .num_threads(ncores.unwrap_or(0))
+        .build()
+        .map_err(|e| PyRuntimeError::new_err(format!("Failed to build thread pool: {e}")))?;
+    let ga_result =
+        pool.install(|| run_ga(pop, &mut rng, max_generations, hof_capacity, |_, _| {}));
     let hof_entries = ga_result.hall_of_fame.entries();
 
     let entries: Vec<&HallOfFameEntry> = if sampling.is_some() {
@@ -232,6 +241,7 @@ mod tests {
                 ligand_pdb,
                 Some(vec![(1, 1)]),
                 Some(2),
+                None,
                 None,
                 Some(1),
                 None,

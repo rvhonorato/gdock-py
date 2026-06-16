@@ -43,6 +43,7 @@ def main():
         restraints=RESTRAINTS,
         max_generations=10,
         population_size=50,
+        ncores=4,
         seed=42,
     )
     print(f"generations run: {result['generationsRun']}")
@@ -66,6 +67,7 @@ def main():
         max_generations=10,
         population_size=50,
         seed=42,
+        ncores=4,
         sampling=500,
     )
     print(f"generations run: {result['generationsRun']}")

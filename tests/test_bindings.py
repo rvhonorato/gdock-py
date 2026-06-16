@@ -133,6 +133,55 @@ def test_dock_sampling_fills_capacity():
     assert len(result["models"]) == 5
 
 
+def test_dock_ncores_accepts_parameter():
+    result = gdock.dock(
+        RECEPTOR_PDB,
+        LIGAND_PDB,
+        max_generations=2,
+        seed=1,
+        ncores=2,
+    )
+    assert result["generationsRun"] >= 1
+    assert len(result["models"]) > 0
+
+
+def test_dock_ncores_results_match_single_core():
+    kwargs = dict(
+        receptor_pdb=RECEPTOR_PDB,
+        ligand_pdb=LIGAND_PDB,
+        max_generations=5,
+        seed=42,
+    )
+    r1 = gdock.dock(**kwargs, ncores=1)
+    r2 = gdock.dock(**kwargs, ncores=2)
+    assert len(r1["models"]) == len(r2["models"])
+    for m1, m2 in zip(r1["models"], r2["models"]):
+        assert m1["fitness"] == m2["fitness"]
+
+
+def test_dock_multicore_is_faster():
+    import time
+
+    kwargs = dict(
+        receptor_pdb=RECEPTOR_PDB,
+        ligand_pdb=LIGAND_PDB,
+        max_generations=50,
+        population_size=100,
+        seed=1,
+    )
+    t0 = time.monotonic()
+    gdock.dock(**kwargs, ncores=1)
+    t_single = time.monotonic() - t0
+
+    t0 = time.monotonic()
+    gdock.dock(**kwargs, ncores=4)
+    t_multi = time.monotonic() - t0
+
+    assert t_multi < t_single, (
+        f"multi-core ({t_multi:.3f}s) was not faster than single-core ({t_single:.3f}s)"
+    )
+
+
 def test_dock_invalid_pdb_raises():
     try:
         gdock.dock("not a pdb", LIGAND_PDB)

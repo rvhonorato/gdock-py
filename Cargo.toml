@@ -1,6 +1,6 @@
 [package]
 name = "gdock-py"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 license = "0BSD"
 authors = ["Rodrigo V. Honorato <rvhonorato@protonmail.com>"]
@@ -17,6 +17,7 @@ crate-type = ["cdylib"]
 gdock = "2.1.0"
 pyo3 = "0.26"
 rand = "0.8"
+rayon = "1.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
