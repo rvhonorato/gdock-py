@@ -30,8 +30,12 @@ result = gdock.dock(
     seed=42,
 )
 print(f"Generations run: {result['generationsRun']}")
+print(f"Converged early: {result['convergedEarly']}")
 print(f"Best fitness: {result['models'][0]['fitness']}")
 best_pdb = result["models"][0]["pdb"]
+
+# Pass restraints as a HADDOCK TBL file
+result = gdock.dock(receptor_pdb, ligand_pdb, restraints="ambig.tbl")
 
 # Sampling mode — collect a large pool of unique conformations sorted by fitness
 result = gdock.dock(
@@ -43,6 +47,18 @@ result = gdock.dock(
 for model in result["models"]:
     print(f"rank={model['rank']} fitness={model['fitness']:.3f}")
 ```
+
+## Restraints
+
+Restraints tell the GA which receptor and ligand residues should be in contact.
+They can be provided as:
+
+- **A list of integer pairs** — `[(rec_resseq, lig_resseq), ...]`
+- **A HADDOCK TBL file path** — `restraints="ambig.tbl"` (string ending in `.tbl`)
+
+Restraints use OR-group semantics (HADDOCK-style ambiguous AIR): a residue pair is
+satisfied when **any** of the specified partners are within the target distance,
+not all of them simultaneously.
 
 ## API
 
@@ -57,7 +73,8 @@ Runs the genetic algorithm docking pipeline and returns ranked models:
 
 ```
 {
-  "generationsRun": int,
+  "generationsRun": int,       # generations actually executed
+  "convergedEarly": bool,      # true if stopped before max_generations
   "models": [
     {"rank", "fitness", "vdw", "elec", "desolv", "air", "pdb"},
     ...
