@@ -5,7 +5,7 @@ use gdock::constants::{self, EnergyWeights};
 use gdock::fitness;
 use gdock::hall_of_fame::HallOfFameEntry;
 use gdock::population::Population;
-use gdock::restraints::create_restraints_from_pairs;
+use gdock::restraints::create_ambiguous_restraints_from_pairs;
 use gdock::runner::{run_ga, select_models};
 use gdock::structure::{self, combine_molecules, Molecule};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -80,6 +80,7 @@ struct Model {
 #[serde(rename_all = "camelCase")]
 struct DockResult {
     generations_run: u64,
+    converged_early: bool,
     models: Vec<Model>,
 }
 
@@ -101,6 +102,7 @@ struct DockResult {
 /// Returns:
 ///     dict with keys:
 ///         - generations_run: number of generations executed
+///         - converged_early: true if the GA stopped before max_generations due to no improvement
 ///         - models: ranked models, each with rank, fitness, vdw, elec, desolv, air, pdb
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
@@ -109,7 +111,7 @@ fn dock(
     py: Python<'_>,
     receptor_pdb: &str,
     ligand_pdb: &str,
-    restraints: Option<Vec<(i32, i32)>>,
+    restraints: Option<pyo3::Bound<'_, pyo3::PyAny>>,
     max_generations: Option<u64>,
     population_size: Option<u64>,
     ncores: Option<usize>,
@@ -119,8 +121,17 @@ fn dock(
     let receptor = parse_molecule(receptor_pdb, "Receptor")?;
     let ligand = parse_molecule(ligand_pdb, "Ligand")?;
 
-    let pairs = restraints.unwrap_or_default();
-    let restraint_list = create_restraints_from_pairs(&receptor, &ligand, &pairs);
+    let pairs: Vec<(i32, i32)> = match restraints {
+        None => vec![],
+        Some(r) => {
+            if let Ok(path) = r.extract::<String>() {
+                gdock::commands::restraints::tbl_to_pairs(&path)
+            } else {
+                r.extract::<Vec<(i32, i32)>>()?
+            }
+        }
+    };
+    let restraint_list = create_ambiguous_restraints_from_pairs(&receptor, &ligand, &pairs);
 
     let max_generations = max_generations.unwrap_or(constants::MAX_GENERATIONS);
     let population_size = population_size.unwrap_or(constants::POPULATION_SIZE);
@@ -191,6 +202,7 @@ fn dock(
 
     let result = DockResult {
         generations_run: ga_result.generations_run,
+        converged_early: ga_result.converged_early,
         models,
     };
 
@@ -239,7 +251,7 @@ mod tests {
                 py,
                 receptor_pdb,
                 ligand_pdb,
-                Some(vec![(1, 1)]),
+                None,
                 Some(2),
                 None,
                 None,
@@ -255,6 +267,12 @@ mod tests {
                 .extract()
                 .unwrap();
             assert!(generations_run >= 1);
+            let _converged_early: bool = dict
+                .get_item("convergedEarly")
+                .unwrap()
+                .unwrap()
+                .extract()
+                .unwrap();
             let models = dict.get_item("models").unwrap().unwrap();
             let models = models.downcast::<PyList>().unwrap();
             assert!(models.len() > 0);

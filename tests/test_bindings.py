@@ -36,6 +36,7 @@ def test_dock():
         seed=1,
     )
     assert result["generationsRun"] >= 1
+    assert isinstance(result["convergedEarly"], bool)
     assert len(result["models"]) > 0
 
     model = result["models"][0]
@@ -180,6 +181,41 @@ def test_dock_multicore_is_faster():
     assert t_multi < t_single, (
         f"multi-core ({t_multi:.3f}s) was not faster than single-core ({t_single:.3f}s)"
     )
+
+
+def test_dock_restraints_as_tbl_file(tmp_path):
+    # Standard HADDOCK TBL: bidirectional assign blocks so both segids appear as anchors
+    # (tbl_to_pairs requires active-active pairs — both residues must appear as anchors).
+    tbl_file = tmp_path / "ambig.tbl"
+    tbl_file.write_text(
+        "assign (resid 1 and segid A) (resid 1 and segid B) 2.0 2.0 0.0\n"
+        "assign (resid 1 and segid B) (resid 1 and segid A) 2.0 2.0 0.0\n"
+    )
+    result = gdock.dock(
+        RECEPTOR_PDB,
+        LIGAND_PDB,
+        restraints=str(tbl_file),
+        max_generations=2,
+        seed=1,
+    )
+    assert result["generationsRun"] >= 1
+    assert len(result["models"]) > 0
+
+
+def test_dock_restraints_tbl_equals_pairs(tmp_path):
+    # Bidirectional TBL with resid 1 A ↔ resid 1 B should produce the same pairs as [(1, 1)].
+    tbl_file = tmp_path / "ambig.tbl"
+    tbl_file.write_text(
+        "assign (resid 1 and segid A) (resid 1 and segid B) 2.0 2.0 0.0\n"
+        "assign (resid 1 and segid B) (resid 1 and segid A) 2.0 2.0 0.0\n"
+    )
+    r_pairs = gdock.dock(
+        RECEPTOR_PDB, LIGAND_PDB, restraints=[(1, 1)], max_generations=2, seed=1
+    )
+    r_tbl = gdock.dock(
+        RECEPTOR_PDB, LIGAND_PDB, restraints=str(tbl_file), max_generations=2, seed=1
+    )
+    assert r_pairs["models"][0]["fitness"] == r_tbl["models"][0]["fitness"]
 
 
 def test_dock_invalid_pdb_raises():
